@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <zip.h>
+#include <unistd.h>
 
 // we define the name of the directory where the files will be extracted to
 #define EXTRACT_DIR "./extracted_files/"
@@ -116,6 +117,54 @@ void extract_file(struct zip *zip_file, int file_index, char *file_name) {
   printw("\n");
 }
 
+// add a file to the current zip
+void add_file(struct zip *zip_file){
+  // get the file name from the user
+  char file_name[256];
+  int ch;
+  int i = 0;
+  while(1){
+  printw("Enter the path of the file : ");
+    // make the while loop till the user press enter
+    while ((ch = getch()) != '\n') {
+      if (ch == KEY_BACKSPACE || ch == 127) {
+        if (i > 0) {
+          file_name[--i] = '\0';
+          printw("\b \b");
+          refresh();
+        }
+      } else {
+        file_name[i++] = ch;
+        file_name[i] = '\0';
+        printw("%c", ch);
+        refresh();
+      }
+    }
+    // check if the file exists
+    if (access(file_name, F_OK) != -1) {
+      // creating a source for the file
+      zip_source_t *source = zip_source_file(zip_file, file_name, 0, -1);
+      if (!source) {
+        printw("\nError creating source for file %s\n", file_name);
+        return;
+      }
+      // add the file to the zip
+      int index = zip_file_add(zip_file, file_name, source, ZIP_FL_OVERWRITE);
+      if (index < 0) {
+        printw("\nError adding file %s to zip\n", file_name);
+      } else {
+        printw("\nFile %s added successfully to %s\n", file_name, zip_file);
+        printw("\nPress any key to go back to the menu\n");
+      }
+      break;
+    } else {
+      printw("\nFile does not exist, please enter a valid file path : ");
+      i = 0;
+    }
+  }
+}
+
+
 // print the help message
 void print_help(const char *program_name) {
   printf("Usage : %s [OPTIONS]\n", program_name);
@@ -153,12 +202,13 @@ int main(int argc, char *argv[]) {
   initscr();
   cbreak();
   noecho();
+  // Enable keypad for arrow keys and other special keys
   keypad(stdscr, TRUE);
 
   // this is for the main menu
   int choice = 1;
-  char *choices[3] = {"Print the content of a file", "Extract a file", "Quit"};
-  int max_choice = 3;
+  char *choices[4] = {"Print the content of a file", "Extract a file","Add a file to the current zip", "Quit"};
+  int max_choice = 4;
   // the pressed key
   int key;
   // Open the zip file
@@ -243,8 +293,16 @@ int main(int argc, char *argv[]) {
         }
         break;
       case 3:
-        printw("Quitting...\n");
+        clear();
+        ascii_art();
+        add_file(zip_file);
+        printw("\nPress any key to go back to the menu\n");
         refresh();
+        getch();
+        break;
+      case 4:
+        printw("Quitting...\n");
+        zip_close(zip_file);
         endwin();
         return 0;
       default:
