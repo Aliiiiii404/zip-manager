@@ -20,7 +20,6 @@ void ascii_art() {
 
 // print choices
 void print_choices(char *choices[], int max_choice, int choice) {
-  printw("Choose an option:\n");
   for (int i = 0; i < max_choice; ++i) {
     if (choice - 1 == i)
       printw("[ * ]");
@@ -174,7 +173,9 @@ int main(int argc, char *argv[]) {
     clear();
     // Print the ascii art
     ascii_art();
-    // Display options
+    // Display the menu
+    printw("Welcome to the zip viewer\n");
+    printw("Choose an option:\n");
     print_choices(choices, max_choice, choice);
     refresh();
     // Get user input
@@ -195,7 +196,8 @@ int main(int argc, char *argv[]) {
           clear();
           ascii_art();
           get_file_names(zip_file, num_files, file_names);
-          printw("Choose a file to print : \n");
+          printw("Choose a file to print\n");
+          printw("Press Q to go back to the menu\n");
           print_choices(file_names, num_files, file_choice);
           refresh();
           key = getch();
@@ -209,6 +211,9 @@ int main(int argc, char *argv[]) {
             refresh();
             getch();
             break;
+          // presse Q to go back to the menu
+          } else if (key == 113) {
+            break;
           }
         }
         break;
@@ -217,7 +222,8 @@ int main(int argc, char *argv[]) {
           clear();
           ascii_art();
           get_file_names(zip_file, num_files, file_names);
-          printw("Choose a file to extract : \n");
+          printw("Choose a file to extract\n");
+          printw("Press Q to go back to the menu\n");
           print_choices(file_names, num_files, file_choice);
           refresh();
           key = getch();
@@ -230,6 +236,8 @@ int main(int argc, char *argv[]) {
             printw("\nPress any key to go back to the menu\n");
             refresh();
             getch();
+            break;
+          } else if (key == 113) {
             break;
           }
         }
