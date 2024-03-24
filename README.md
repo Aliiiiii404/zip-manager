@@ -1,1 +1,1 @@
-# zip-manager
+# Zip manager
