@@ -112,6 +112,7 @@ void extract_file(struct zip *zip_file, int file_index, char *file_name) {
   FILE *new_file = fopen(path, "wb");
   if (!new_file) {
     printw("Error creating file %s\n", path);
+    endwin();
     return;
   }
   // add the content of the file to the new file
@@ -180,13 +181,104 @@ void add_file(struct zip *zip_file, const char *zip_file_name){
   }
 }
 
+// brute force the password of the encrypted file
+void brute_force(){
+  FILE *word_list;
+  char zip_file_name[256];
+  char password[50];
+  int num_passwds_tested = 0;
+  int ch;
+  int i = 0;
+  // get the file name from the user
+  printw("\npress ESC to go back to the menu\n");
+  printw("Enter the path of the file : ");
+  while(1){
+    // make the while loop till the user press enter
+    while ((ch = getch()) != '\n') {
+      if (ch == KEY_BACKSPACE || ch == 127) {
+        if (i > 0) {
+          zip_file_name[--i] = '\0';
+          printw("\b \b");
+          refresh();
+        }
+      // press ESC to go back to the menu
+      }else if(ch == 27){
+        return;
+      }else {
+        zip_file_name[i++] = ch;
+        zip_file_name[i] = '\0';
+        printw("%c", ch);
+        refresh();
+      }
+    }
+    // check if the file exists
+    if (access(zip_file_name, F_OK) != -1) {
+      // Open the zip file
+      struct zip *zip = zip_open(zip_file_name, 0, NULL);
+      if (zip) {
+        // get the file number
+        int num_files = get_number_files(zip);
+        if (num_files < 0) {
+          printw("This zip file is empty, try another one\n");
+          printw("\nPress any key to go back to the menu\n");
+          refresh();
+          getch();
+          return;
+        }
+        printw("\nTrying all the passwords in the word list, please wait !!\n");
+        word_list = fopen("word-list", "r");
+        if (word_list == NULL){
+          printw("Error opening the file.\n");
+          break;
+        }
+        int found_pass = 0;
+        // test all the passwords in the word list
+        while(fgets(password, sizeof(password), word_list)){
+          password[strcspn(password, "\n")] = '\0';
+          // chose the first file to test the password on
+          zip_file_t *zip_file = zip_fopen_encrypted(zip, "test1.txt", 0, password);
+          if (zip_file) {
+            found_pass = 1;
+            zip_fclose(zip_file);
+            break;
+          }else{
+            found_pass = 0;
+          }
+          num_passwds_tested++;
+          // clear the password
+          memset(password, 0, sizeof(password));
+        }
+        // close the file
+        fclose(word_list);
+        // close the zip file
+        zip_close(zip);
+        printw("\nNumber of passwords tested : %d\n", num_passwds_tested);
+        if (found_pass == 0){
+          printw("Password not found in the word list\n");
+        }else if(found_pass == 1){
+          printw("Password found : %s\n", password);
+        }
+        printw("\nPress any key to go back to the menu\n");
+        refresh();
+        getch();
+        return;
+      } else {
+        printw("\nThis is not a zip file, enter a valid zip file : ");
+        i = 0;
+      }
+    } else {
+      printw("\nFile does not exist, please enter a valid file path : ");
+      i = 0;
+    }
+  }
+}
 
 // print the help message
 void print_help(const char *program_name) {
   printf("Usage : %s [OPTIONS]\n", program_name);
   printf("Options : \n");
   printf("    -f <filename> Specify the input file\n");
-  printf("    -p <password> Specify the password for the encrypted file\n");
+  /* printf("    -p <password> Specify the password for the encrypted file\n"); */
   printf("    -h Show this help\n");
 }
 
@@ -196,7 +288,6 @@ int main(int argc, char *argv[]) {
   int opt;
   // zip file name, set to NULL by default and set by the user with -f
   const char *zip_file_name = NULL;
-  const char *password = NULL;
   // parse the options
   while ((opt = getopt(argc, argv, "f:h")) != -1) {
     switch (opt) {
@@ -208,32 +299,36 @@ int main(int argc, char *argv[]) {
       exit(EXIT_SUCCESS);
     case '?':
       printf("Invalid option. Use -h or --help for usage.\n");
+      endwin();
       exit(EXIT_FAILURE);
     }
   }
   // check if the filename is set
   if (zip_file_name == NULL) {
     printf("Invalid option. Use -h or --help for usage.\n");
+    endwin();
     exit(EXIT_FAILURE);
   }
-  // Initialize ncurses
-  initscr();
-  cbreak();
-  noecho();
-  // Enable keypad for arrow keys and other special keys
-  keypad(stdscr, TRUE);
-  // this is for the main menu
-  int choice = 1;
-  char *choices[4] = {"Print the content of a file", "Extract a file","Add a file to the current zip", "Quit"};
-  int max_choice = 4;
-  // the pressed key
-  int key;
   // Open the zip file
   struct zip *zip_file_open = zip_open(zip_file_name, 0, NULL);
   if (!zip_file_open) {
     printf("Error opening zip file %s\n", zip_file_name);
     return 1;
   }
+  // Initialize ncurses
+  initscr();
+  cbreak();
+  noecho();
+  //start color support 
+  start_color();
+  // Enable keypad for arrow keys and other special keys
+  keypad(stdscr, TRUE);
+  // this is for the main menu
+  int choice = 1;
+  char *choices[5] = {"Print the content of a file", "Extract a file","Add a file to the current zip","Bruteforce a zip file", "Quit"};
+  int max_choice = 5;
+  // the pressed key
+  int key;
   // Main program loop
   while (1) {
     // Clear the screen
@@ -264,7 +359,7 @@ int main(int argc, char *argv[]) {
           ascii_art();
           get_file_names(zip_file_open, num_files, file_names);
           printw("Choose a file to print\n");
-          printw("Press Q to go back to the menu\n");
+          printw("Press ESQ to go back to the menu\n");
           print_choices(file_names, num_files, file_choice);
           refresh();
           key = getch();
@@ -279,7 +374,7 @@ int main(int argc, char *argv[]) {
             getch();
             break;
           // presse Q to go back to the menu
-          } else if (key == 113) {
+          } else if (key == 27) {
             break;
           }
         }
@@ -290,7 +385,7 @@ int main(int argc, char *argv[]) {
           ascii_art();
           get_file_names(zip_file_open, num_files, file_names);
           printw("Choose a file to extract\n");
-          printw("Press Q to go back to the menu\n");
+          printw("Press ESC to go back to the menu\n");
           print_choices(file_names, num_files, file_choice);
           refresh();
           key = getch();
@@ -304,7 +399,7 @@ int main(int argc, char *argv[]) {
             refresh();
             getch();
             break;
-          } else if (key == 113) {
+          } else if (key == 27) {
             break;
           }
         }
@@ -315,6 +410,11 @@ int main(int argc, char *argv[]) {
         add_file(zip_file_open, zip_file_name);
         break;
       case 4:
+        clear();
+        ascii_art();
+        brute_force();
+        break;
+      case 5:
         printw("Quitting...\n");
         zip_close(zip_file_open);
         endwin();
