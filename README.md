@@ -1,3 +1,3 @@
 # Zip manager
-This is a simple zip manager that allows you to print the content of a zip file, extract a zip file.
-its written in C and uses the libzip as a library to handle zip files, ncurses to create a simple user interface and getopt to parse the command line arguments.
+This is a simple zip manager that allows you to print, add or extract a file from the zip and you can also brute force a zip that has password protection on.
+its written in C and uses the libzip library to handle zip files, ncurses to create a simple user interface and getopt to parse the command line arguments.
