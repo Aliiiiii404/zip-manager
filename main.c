@@ -62,9 +62,9 @@ void get_file_content(struct zip *zip_file, int file_index) {
   file_index = file_index - 1;
   // Open the specified file
   struct zip_file *file = zip_fopen_index(zip_file, file_index, 0);
+  const zip_error_t *error = zip_get_error(zip_file);
   if (!file) {
     // check if the file is encrypted
-    const zip_error_t *error = zip_get_error(zip_file);
     if(zip_error_code_zip(error) == ZIP_ER_NOPASSWD)
       printw("This file is encrypted, try running -h for more infos\n");
     else
@@ -76,9 +76,13 @@ void get_file_content(struct zip *zip_file, int file_index) {
   zip_stat_index(zip_file, file_index, 0, &file_stat);
   printw("\n");
   if (file_stat.size == 0) {
-    printw("This file is empty\n");
+    if(zip_error_code_zip(error) == ZIP_ER_NOPASSWD)
+      printw("This file is encrypted, try running -h for more infos\n");
+    else
+      printw("This file is empty\n");
     return;
   } else {
+    clear();
     // Print the content of the file
     char *buffer = malloc(file_stat.size);
     int len;
@@ -131,7 +135,7 @@ void extract_file(struct zip *zip_file, int file_index, char *file_name) {
 // add a file to the current zip
 void add_file(struct zip *zip_file, const char *zip_file_name){
   // get the file name from the user
-  char file_name[256];
+  char full_file_name[256];
   int ch;
   int i = 0;
   printw("\npress ESC to go back to the menu\n");
@@ -141,7 +145,7 @@ void add_file(struct zip *zip_file, const char *zip_file_name){
     while ((ch = getch()) != '\n') {
       if (ch == KEY_BACKSPACE || ch == 127) {
         if (i > 0) {
-          file_name[--i] = '\0';
+          full_file_name[--i] = '\0';
           printw("\b \b");
           refresh();
         }
@@ -149,19 +153,26 @@ void add_file(struct zip *zip_file, const char *zip_file_name){
       }else if (ch == 27){
         return;
       }else {
-        file_name[i++] = ch;
-        file_name[i] = '\0';
+        full_file_name[i++] = ch;
+        full_file_name[i] = '\0';
         printw("%c", ch);
         refresh();
       }
     }
     // check if the file exists
-    if (access(file_name, F_OK) != -1) {
+    if (access(full_file_name, F_OK) != -1) {
       // creating a source for the file
-      zip_source_t *source = zip_source_file(zip_file, file_name, 0, -1);
+      zip_source_t *source = zip_source_file(zip_file, full_file_name, 0, -1);
       if (!source) {
-        printw("\nError creating source for file %s\n", file_name);
+        printw("\nError creating source for file %s\n", full_file_name);
         return;
+      }
+      // removing the full path and keeping the name only
+      char *file_name = strrchr(full_file_name, '/');
+      if (file_name != NULL) {
+        file_name++;
+      } else {
+        file_name = full_file_name;
       }
       // add the file to the zip
       int index = zip_file_add(zip_file, file_name, source, ZIP_FL_OVERWRITE);
@@ -235,7 +246,7 @@ void brute_force(){
         // test all the passwords in the word list
         while(fgets(password, sizeof(password), word_list)){
           password[strcspn(password, "\n")] = '\0';
-          // chose the first file to test the password on
+          // chose the first file to test the passwords
           zip_file_t *zip_file = zip_fopen_encrypted(zip, "test1.txt", 0, password);
           if (zip_file) {
             found_pass = 1;
@@ -296,6 +307,7 @@ int main(int argc, char *argv[]) {
       break;
     case 'h':
       print_help(argv[0]);
+      endwin();
       exit(EXIT_SUCCESS);
     case '?':
       printf("Invalid option. Use -h or --help for usage.\n");
@@ -359,7 +371,7 @@ int main(int argc, char *argv[]) {
           ascii_art();
           get_file_names(zip_file_open, num_files, file_names);
           printw("Choose a file to print\n");
-          printw("Press ESQ to go back to the menu\n");
+          printw("Press ESC to go back to the menu\n");
           print_choices(file_names, num_files, file_choice);
           refresh();
           key = getch();
